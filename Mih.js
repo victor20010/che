@@ -1,5 +1,5 @@
-// Calculate the buy and sell price for an item on Steam Community Market
-// Рассчитать цену покупки и продажи товара на Steam Community Market
+// Calculate the buy and sell price for an item on Steam Community Market, including all Steam fees and to get the profit considering those fees
+// Рассчитать цену покупки и продажи товара на Steam Community Market, включая все комиссии Steam, и получить прибыль с учётом комиссий
 
 function calculateItemPrice(itemName, appId, corridor, profitPercentage, pleasantProfit, analysisPeriod, analyzeBeforeOrder, analyzeBeforeSale, stickerMarkupPercentage, minimumStickerMarkup, includeStickers) {
   // Calculate start and end dates for price analysis
@@ -14,7 +14,7 @@ function calculateItemPrice(itemName, appId, corridor, profitPercentage, pleasan
     .then(response => response.json())
     .then(data => {
       // filter prices using price corridor
-      // Выбрать цены в по заданному коридору
+      // Выбрать цены в заданном коридоре
       const prices = data.prices.filter(price => price[1] >= corridor && price[1] <= (100-corridor));
 
       // calculate sticker markup
@@ -46,20 +46,23 @@ function calculateItemPrice(itemName, appId, corridor, profitPercentage, pleasan
       const stickerAdjustedBuyPrice = Math.max(1, buyPrice + stickerMarkup);
       let sellPrice = Math.floor(stickerAdjustedBuyPrice * (1 + profitPercentage / 100) * (1 - 0.15));
       const steamFee = Math.floor(sellPrice * 0.15);
-      let actualProfit = Math.floor((sellPrice - stickerAdjustedBuyPrice) / stickerAdjustedBuyPrice * 100);
+      const actualProfitBeforeFees = Math.floor((sellPrice - stickerAdjustedBuyPrice) / stickerAdjustedBuyPrice * 100);
+      const actualProfitAfterFees = Math.floor((sellPrice - stickerAdjustedBuyPrice - steamFee) / stickerAdjustedBuyPrice * 100);
 
       // recalculate prices if pleasant profit not met
-      // Пересчитать цены, если цель прибыли не достигнута
-      while (actualProfit < pleasantProfit) {
+      // Пересчитать цены, если желаемый уровень прибыли не достигнут
+      while (actualProfitAfterFees < pleasantProfit) {
         buyPrice += 1;
         const newStickerAdjustedBuyPrice = Math.max(1, buyPrice + stickerMarkup);
         const newSellPrice = Math.floor(newStickerAdjustedBuyPrice * (1 + profitPercentage / 100) * (1 - 0.15));
         const newSteamFee = Math.floor(newSellPrice * 0.15);
-        const newActualProfit = Math.floor((newSellPrice - newStickerAdjustedBuyPrice) / newStickerAdjustedBuyPrice * 100);
-        if (newActualProfit > actualProfit) {
+        const newActualProfitBeforeFees = Math.floor((newSellPrice - newStickerAdjustedBuyPrice) / newStickerAdjustedBuyPrice * 100);
+        const newActualProfitAfterFees = Math.floor((newSellPrice - newStickerAdjustedBuyPrice - newSteamFee) / newStickerAdjustedBuyPrice * 100);
+        if (newActualProfitAfterFees > actualProfitAfterFees) {
           sellPrice = newSellPrice;
           steamFee = newSteamFee;
-          actualProfit = newActualProfit;
+          actualProfitBeforeFees = newActualProfitBeforeFees;
+          actualProfitAfterFees = newActualProfitAfterFees;
         } else {
           break;
         }
@@ -127,20 +130,24 @@ function calculateItemPrice(itemName, appId, corridor, profitPercentage, pleasan
             const lastStickerAdjustedPrice = Math.max(1, lastPrice + stickerMarkup);
             const lastSellPrice = Math.floor(lastStickerAdjustedPrice * (1 + profitPercentage / 100) * (1 - 0.15));
             const lastSteamFee = Math.floor(lastSellPrice * 0.15);
-            const lastActualProfit = Math.floor((lastSellPrice - lastStickerAdjustedPrice) / lastStickerAdjustedPrice * 100);
+            const lastActualProfitBeforeFees = Math.floor((lastSellPrice - lastStickerAdjustedPrice) / lastStickerAdjustedPrice * 100);
+            const lastActualProfitAfterFees = Math.floor((lastSellPrice - lastStickerAdjustedPrice - lastSteamFee) / lastStickerAdjustedPrice * 100);
             const stickerAdjustedSellPrice = Math.floor(stickerAdjustedBuyPrice * (1 + profitPercentage / 100) * (1 - 0.15));
-            const stickerAdjustedActualProfit = Math.floor((stickerAdjustedSellPrice - stickerAdjustedBuyPrice) / stickerAdjustedBuyPrice * 100);
+            const stickerAdjustedActualProfitBeforeFees = Math.floor((stickerAdjustedSellPrice - stickerAdjustedBuyPrice) / stickerAdjustedBuyPrice * 100);
+            const stickerAdjustedActualProfitAfterFees = Math.floor((stickerAdjustedSellPrice - stickerAdjustedBuyPrice - steamFee) / stickerAdjustedBuyPrice * 100);
 
             // calculate sticker markup
             // Рассчитать наценку за стикеры
-            stickerMarkupWhenSelling = (stickerAdjustedActualProfit - lastActualProfit) * stickerAdjustedBuyPrice / 100;
+            stickerMarkupWhenSelling = (stickerAdjustedActualProfitAfterFees - lastActualProfitAfterFees) * stickerAdjustedBuyPrice / 100;
           }
 
           // return final buy and sell prices
-          // Вернуть конечную цену покупки и продажи
+          // Вернуть конечные цены покупки и продажи
           const result = {
             buyPrice: buyPrice,
             sellPrice: sellPrice,
+            actualProfitBeforeFees: actualProfitBeforeFees,
+            actualProfitAfterFees: actualProfitAfterFees,
             stickerMarkupWhenSelling: stickerMarkupWhenSelling
           };
           return result;
